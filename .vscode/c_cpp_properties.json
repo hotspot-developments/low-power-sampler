@@ -1,0 +1,38 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/test/fake",
+                "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/**",
+                "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4//variants/nodemcu/",
+                "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/tools/sdk/**",
+                "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/",
+                "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/**",
+                "/home/simon/Arduino/libraries/RTCMemory/**",
+                "/home/simon/Arduino/libraries/PubSubClient/**"
+             ],
+             "forcedInclude": [],
+             "browse": {
+                 "path":[
+                    "${workspaceFolder}/**",
+                    "${workspaceFolder}/test/fake",
+                    "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/libraries/**",
+                    "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4//variants/nodemcu/",
+                    "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/tools/sdk/**",
+                    "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/",
+                    "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/**",
+                    "/home/simon/Arduino/libraries/RTCMemory/**",
+                    "/home/simon/Arduino/libraries/PubSubClient/**"
+                     ]
+             },
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu17",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "gcc-x64"
+        }
+    ],
+    "version": 4
+}

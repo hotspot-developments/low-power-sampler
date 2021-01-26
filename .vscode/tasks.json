@@ -1,0 +1,56 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "cppbuild",
+			"label": "C/C++: g++ build active file",
+			"command": "/usr/bin/g++",
+			"args": [
+				"-I/home/simon/Arduino/libraries/RTCMemory/src",
+				"-g",
+				"${file}",
+				"-o",
+				"${fileDirname}/${fileBasenameNoExtension}"
+			],
+			"options": {
+				"cwd": "/usr/bin"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": "build",
+			"detail": "compiler: /usr/bin/g++"
+		},
+		{
+			"type": "cppbuild",
+			"label": "C/C++: gcc build test",
+			"command": "/usr/bin/gcc",
+			"args": [
+				"-I/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/**",
+				"-I/home/simon/projects/poolsensor/test",
+				"-I/home/simon/projects/poolsensor/test/fake",
+				"-g",
+				"${file}",
+				"-o",
+				"${fileDirname}/out/${fileBasenameNoExtension}",
+				"-L/usr/lib",
+				"-L/usr/lib/gcc/x86_64-linux-gnu/9",
+				"-l:libgtest.a",
+				"-l:libgtest_main.a",
+				"-l:libstdc++.so",
+				"-pthread"
+			],
+			"options": {
+				"cwd": "/usr/bin"
+			},
+			"problemMatcher": [
+				"$gcc"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "compiler: /usr/bin/gcc"
+		}
+	]
+}
