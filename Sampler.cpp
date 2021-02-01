@@ -8,6 +8,7 @@ unsigned long millis();
 
 Sampler::Sampler(Configuration& config) {
     this->configuration = &config;
+    config.resetSynchronisation(0,1.0);
 }
 
 void Sampler::setup() {
@@ -96,4 +97,8 @@ bool Sampler::isSampleDue(int32_t c) {
 
 bool Sampler::isMeasurementDue(int32_t c) {
     return ((c - (int32_t)this->n) % (int32_t)this->y) == 0;
+}
+
+void Sampler::synchronise(uint32_t timeInSeconds) {
+    
 }

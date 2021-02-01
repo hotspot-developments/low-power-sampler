@@ -32,6 +32,7 @@ class Sampler {
     void onTakeSample(SampleCallBack fnSample);
     void onTakeMeasurement(MeasurementCallBack fnMeasurement);
     void onTransmit(TransmitCallBack fnTransmit);
+    void synchronise(uint32_t timeInSeconds);
 };
 
 #endif // SAMPLER_H

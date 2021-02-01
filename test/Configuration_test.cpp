@@ -3,8 +3,20 @@
 
 
 TEST(ConfigurationTest, Construction) {
-    Configuration config();
-    ASSERT_TRUE(config != nullptr);
+    Configuration config;
+    Parameters params;
+    Synchronisation sync;
+
+    config.populateParameters(&params);
+    ASSERT_EQ(params.counter, 1);
+    ASSERT_EQ(params.currentVersion,0);
+    ASSERT_EQ(params.measurementInterval,0);
+    ASSERT_EQ(params.sampleInterval,0);
+    ASSERT_EQ(params.nSamples,0);
+    ASSERT_EQ(params.transmitFrequency,0);
+
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
 }
 
 TEST(ConfigurationTest, IncrementCounter) {
@@ -47,7 +59,7 @@ TEST(ConfigurationTest, SetParameters) {
     config.populateParameters(&params);
 
     ASSERT_STRCASEEQ(
-        "Version: 10, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 10, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
     ASSERT_EQ(10, params.currentVersion);
     ASSERT_EQ(2, params.counter);
@@ -68,7 +80,7 @@ TEST(ConfigurationTest, SetParameters2) {
     config.populateParameters(&params);
 
     ASSERT_STRCASEEQ(
-        "Version: 0, counter: 1, measurementInterval: 1000, sampleInterval: 0, nSamples: 1, transmitFrequency: 1",
+        "Version: 0, counter: 1, measurementInterval: 1000, sampleInterval: 0, nSamples: 1, transmitFrequency: 1, calibration: 1.000000",
         msg);
     ASSERT_EQ(0, params.currentVersion);
     ASSERT_EQ(1, params.counter);
@@ -101,14 +113,14 @@ TEST(ConfigurationTest, LoadConfiguration) {
     ASSERT_TRUE(config.checkMemory());
     loadedConfiguration.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 0, counter: 1, measurementInterval: 0, sampleInterval: 0, nSamples: 0, transmitFrequency: 0",
+        "Version: 0, counter: 1, measurementInterval: 0, sampleInterval: 0, nSamples: 0, transmitFrequency: 0, calibration: 1.000000",
         msg);
 
     bool loaded = loadedConfiguration.fromMemory();
     ASSERT_TRUE(loaded);
     loadedConfiguration.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 1, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 1, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
 }
 
@@ -134,7 +146,7 @@ TEST(ConfigurationTest, LoadFromJSON) {
     config.populateParameters(&params);
     
     ASSERT_STRCASEEQ(
-        "Version: 16, counter: 1, measurementInterval: 21600000, sampleInterval: 5000, nSamples: 3, transmitFrequency: 2",
+        "Version: 16, counter: 1, measurementInterval: 21600000, sampleInterval: 5000, nSamples: 3, transmitFrequency: 2, calibration: 1.000000",
         msg);
     ASSERT_EQ(16, params.currentVersion);
     ASSERT_EQ(1, params.counter);
@@ -153,37 +165,37 @@ TEST(ConfigurationTest, LoadOneFromJSON) {
     config.incrementCounter();
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 4, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 4, counter: 2, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
 
     config.fromJson("version: 7");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
 
     config.fromJson("transmitFrequency: 7");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 7",
+        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 7, calibration: 1.000000",
         msg);
 
     config.fromJson("measurementInterval: 7200000");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 7",
+        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 7, calibration: 1.000000",
         msg);
 
     config.fromJson("nSamples: 10");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 1000, nSamples: 10, transmitFrequency: 7",
+        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 1000, nSamples: 10, transmitFrequency: 7, calibration: 1.000000",
         msg);
 
     config.fromJson("sampleInterval: 2000");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 2000, nSamples: 10, transmitFrequency: 7",
+        "Version: 7, counter: 1, measurementInterval: 7200000, sampleInterval: 2000, nSamples: 10, transmitFrequency: 7, calibration: 1.000000",
         msg);
 }
 
@@ -195,13 +207,13 @@ TEST(ConfigurationTest, DontLoadCounterFromJSON) {
     config.setVersion(7);
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
 
     config.fromJson("counter: 2");
     config.populateStatusMsg(msg, 250);
     ASSERT_STRCASEEQ(
-        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3",
+        "Version: 7, counter: 1, measurementInterval: 3600000, sampleInterval: 1000, nSamples: 5, transmitFrequency: 3, calibration: 1.000000",
         msg);
     ASSERT_EQ(1, config.getCounter());
 }
@@ -248,6 +260,49 @@ TEST(ConfigurationTest, LoadConfigurationLoadsDataFromMemory) {
         ASSERT_EQ(loadedData[i], i+1);
     }
 }
+
+
+TEST(ConfigurationTest, ResetSynchronizationSetsMemberData) {
+    Configuration config;
+    Synchronisation sync;
+    
+    config.resetSynchronisation(121343565, 1.0001);
+    config.populateSynchronisation(&sync);
+
+    ASSERT_EQ(sync.syncTime, 121343565);
+    ASSERT_EQ(sync.nominalElapsed, 0);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0001);
+}
+
+TEST(ConfigurationTest, LoadConfigurationLoadsSynchronizationDataFromMemory) {
+    char msg[250];
+    Configuration config;
+    Configuration loadedConfiguration;
+    Synchronisation sync;
+    loadedConfiguration.resetSynchronisation(0, 0.0);
+    config.resetSynchronisation(121343565, 1.0005);
+    config.incrementElapsed(1200000);
+
+    loadedConfiguration.populateSynchronisation(&sync);
+    ASSERT_EQ(sync.syncTime, 0);
+    ASSERT_EQ(sync.nominalElapsed, 0);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.0);
+
+    config.save();
+
+    ASSERT_TRUE(config.checkMemory());
+ 
+    bool loaded = loadedConfiguration.fromMemory();
+    ASSERT_TRUE(loaded);
+
+    loadedConfiguration.populateSynchronisation(&sync);
+    ASSERT_EQ(sync.syncTime, 121343565);
+    ASSERT_EQ(sync.nominalElapsed, 1200);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0005);
+}
+
+
+
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);

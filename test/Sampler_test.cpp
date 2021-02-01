@@ -758,6 +758,32 @@ TEST_F(SamplerTest, LoopInvokesCallBackFunctionsAppropriately4) {
     }
 }
 
+TEST(SamplerNtpSyncTest, SamplerConstructionInitialisesSyncronisation) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+
+    config.populateSynchronisation(&sync);
+    ASSERT_EQ(sync.syncTime, 0);
+    ASSERT_EQ(sync.nominalElapsed, 0);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.000);
+}
+
+
+TEST(SamplerNtpSyncTest, RtcClockLagsBehindSyncedTime) {
+    Configuration config;
+    Sampler sampler(config);
+    config.setParameters(200000,0,1,1);
+    sampler.setup();
+    sampler.synchronise(1612100000);
+    sampler.loop();
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 200000000);
+    sampler.loop();
+    sampler.synchronise(1612100440);
+    sampler.loop();
+    //Assert sleeptime is 200 - 40 seconds*0.909090...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 144000000);
+}
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);

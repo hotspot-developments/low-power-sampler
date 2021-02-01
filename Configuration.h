@@ -16,9 +16,17 @@ typedef struct {
   uint16_t transmitFrequency;
 } Parameters;
 
+typedef struct {
+  uint32_t startTimeOfDay;
+  uint32_t syncTime;
+  uint32_t nominalElapsed;
+  float    calibrationFactor;
+} Synchronisation;
+
 typedef struct  {
   uint32_t crc32;
   Parameters config;
+  Synchronisation sync;
   uint16_t data[MAX_DATA_ELEMENTS];
 } RtcData;
 
@@ -35,12 +43,14 @@ class Configuration {
     uint32_t calculateCRC32(const uint8_t *data, size_t length) ;
 
   public:
+    Configuration();
     void setParameters(
           uint32_t measurementInterval,
           uint32_t sampleInterval,
           uint16_t nSamples,
           uint16_t transmitFrequency);
     void populateParameters(Parameters* params);
+    void populateSynchronisation(Synchronisation* sync);
     void populateStatusMsg(char * msg, size_t length);
     void fromJson(const char * json);
     bool checkMemory();
@@ -52,6 +62,8 @@ class Configuration {
     void resetCounter();
     uint16_t getCounter();
     uint16_t* getData();
+    void resetSynchronisation(uint32_t time, float factor);
+    void incrementElapsed(uint32_t msSleepTime);
 };
 
 #endif  // _CONFIGURATION_H

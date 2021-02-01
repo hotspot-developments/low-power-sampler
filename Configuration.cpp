@@ -6,6 +6,15 @@
 
 #include "Configuration.h"
 
+Configuration::Configuration() {
+  rtcData.config.counter = 1;
+  rtcData.config.currentVersion = 0;
+  rtcData.config.measurementInterval = 0;
+  rtcData.config.sampleInterval = 0;
+  rtcData.config.nSamples = 0;
+  rtcData.config.transmitFrequency = 0;
+  rtcData.sync.calibrationFactor = 1.0;
+}
 
 
 void Configuration::setParameter(const char* key, const char* value) {
@@ -196,9 +205,10 @@ void Configuration::resetCounter() {
 
 void Configuration::populateStatusMsg(char * msg, size_t length) {
   snprintf(msg, length, 
-          "Version: %hu, counter: %hu, measurementInterval: %u, sampleInterval: %u, nSamples: %hu, transmitFrequency: %hu",
+          "Version: %hu, counter: %hu, measurementInterval: %u, sampleInterval: %u, nSamples: %hu, transmitFrequency: %hu, calibration: %f",
           rtcData.config.currentVersion, rtcData.config.counter,
-          rtcData.config.measurementInterval, rtcData.config.sampleInterval, rtcData.config.nSamples, rtcData.config.transmitFrequency);
+          rtcData.config.measurementInterval, rtcData.config.sampleInterval, rtcData.config.nSamples, rtcData.config.transmitFrequency,
+          rtcData.sync.calibrationFactor);
 }
 
 void Configuration::populateParameters(Parameters* params) {
@@ -208,4 +218,21 @@ void Configuration::populateParameters(Parameters* params) {
   params->sampleInterval = this->rtcData.config.sampleInterval;
   params->nSamples = this->rtcData.config.nSamples;
   params->transmitFrequency = this->rtcData.config.transmitFrequency;
+}
+
+void Configuration::populateSynchronisation(Synchronisation* sync) {
+  sync->startTimeOfDay = this->rtcData.sync.startTimeOfDay;
+  sync->syncTime = this->rtcData.sync.syncTime;
+  sync->nominalElapsed = this->rtcData.sync.nominalElapsed;
+  sync->calibrationFactor = this->rtcData.sync.calibrationFactor;
+}
+
+void Configuration::resetSynchronisation(uint32_t time, float factor) {
+  this->rtcData.sync.syncTime = time;
+  this->rtcData.sync.nominalElapsed = 0;
+  this->rtcData.sync.calibrationFactor = factor;
+}
+
+void Configuration::incrementElapsed(uint32_t msSleepTime) {
+  this->rtcData.sync.nominalElapsed += msSleepTime/1000;
 }
