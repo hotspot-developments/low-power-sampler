@@ -12,9 +12,9 @@ class Sampler {
 
     private:
     Configuration* configuration;
-    Parameters params;
-    uint32_t n, d, y, x, t;
     unsigned long initialTime;
+    uint32_t m, s, n, d, y, x, t, l, e;
+    float o, f;
     bool isTransmitDue(int32_t c);
     bool isSampleDue(int32_t c);
     bool isMeasurementDue(int32_t c);

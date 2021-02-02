@@ -97,6 +97,18 @@ class SamplerTest : public testing::Test {
     }    
 };
 
+class SamplerNtpSyncTest: public testing::Test {
+
+    protected:
+    virtual void SetUp() {
+        uint32_t BadNumber = 0xDEADDEAD;
+        ESP.rtcUserMemoryWrite(OTA_OFFSET, &BadNumber, 4);
+    }
+
+    virtual void TearDown() {}
+
+};
+
 uint16_t SamplerTest::samplesReceived[MAX_DATA_ELEMENTS];
 uint16_t SamplerTest::_nSamples;
 uint16_t SamplerTest::measurementsReceived[MAX_DATA_ELEMENTS];
@@ -123,7 +135,7 @@ TEST_F(SamplerTest, SetupLoadValidConfigFromMemory) {
     char msg[250];
     config.populateStatusMsg(msg,sizeof(msg));
     ASSERT_STRCASEEQ(
-        "Version: 10, counter: 1, measurementInterval: 9000000, sampleInterval: 15000, nSamples: 5, transmitFrequency: 2",
+        "Version: 10, counter: 1, measurementInterval: 9000000, sampleInterval: 15000, nSamples: 5, transmitFrequency: 2, calibration: 1.000000",
         msg);
 }
 
@@ -146,7 +158,7 @@ TEST_F(SamplerTest, SetupDoesntLoadInvalidConfigFromMemory) {
     char msg[250];
     config.populateStatusMsg(msg,sizeof(msg));
     ASSERT_STRCASEEQ(
-        "Version: 2, counter: 1, measurementInterval: 3600000, sampleInterval: 10000, nSamples: 3, transmitFrequency: 1",
+        "Version: 2, counter: 1, measurementInterval: 3600000, sampleInterval: 10000, nSamples: 3, transmitFrequency: 1, calibration: 1.000000",
         msg);
 }
 
@@ -758,7 +770,7 @@ TEST_F(SamplerTest, LoopInvokesCallBackFunctionsAppropriately4) {
     }
 }
 
-TEST(SamplerNtpSyncTest, SamplerConstructionInitialisesSyncronisation) {
+TEST_F(SamplerNtpSyncTest, SamplerConstructionInitialisesSyncronisation) {
     Configuration config;
     Sampler sampler(config);
     Synchronisation sync;
@@ -770,19 +782,104 @@ TEST(SamplerNtpSyncTest, SamplerConstructionInitialisesSyncronisation) {
 }
 
 
-TEST(SamplerNtpSyncTest, RtcClockLagsBehindSyncedTime) {
+TEST_F(SamplerNtpSyncTest, RtcClockLagsBehindSyncedTime) {
     Configuration config;
     Sampler sampler(config);
+    Synchronisation sync;
     config.setParameters(200000,0,1,1);
     sampler.setup();
     sampler.synchronise(1612100000);
+
     sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 200);
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 200000000);
+
     sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 400);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 200000000);
+
     sampler.synchronise(1612100440);
     sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90909090909);
+    ASSERT_EQ(sync.syncTime,1612100440);
+    ASSERT_EQ(sync.nominalElapsed, 200);
     //Assert sleeptime is 200 - 40 seconds*0.909090...
-    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 144000000);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 145455000);
+
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90909090909);
+    ASSERT_EQ(sync.syncTime,1612100440);
+    ASSERT_EQ(sync.nominalElapsed, 400);
+    //Assert next sleep time is 200 * 0.909090909
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 181818000);
+
+    sampler.synchronise(1612100844);
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90009000900);
+    ASSERT_EQ(sync.syncTime,1612100844);
+    ASSERT_EQ(sync.nominalElapsed, 200);
+    //Assert sleeptime is 200 - 4 seconds*0.900090...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 176418000);
+
+}
+
+TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTime) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+    config.setParameters(200000,0,1,1);
+    sampler.setup();
+    sampler.synchronise(1612100000);
+
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 200);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 200000000);
+
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 400);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 200000000);
+
+    sampler.synchronise(1612100360);
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
+    ASSERT_EQ(sync.syncTime,1612100360);
+    ASSERT_EQ(sync.nominalElapsed, 200);
+    //Assert sleeptime is 200 + 40 seconds*1.1111111...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 266667000);
+
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
+    ASSERT_EQ(sync.syncTime,1612100360);
+    ASSERT_EQ(sync.nominalElapsed, 400);
+    //Assert next sleep time is 200 * 0.909090909
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 222222000);
+
+    sampler.synchronise(1612100756);
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.12233445566);
+    ASSERT_EQ(sync.syncTime,1612100756);
+    ASSERT_EQ(sync.nominalElapsed, 200);
+    //Assert sleeptime is 200 + 4 seconds*1.12233445566...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 228956000);
+
 }
 
 int main(int argc, char** argv) {

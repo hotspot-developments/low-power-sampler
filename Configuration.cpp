@@ -14,6 +14,8 @@ Configuration::Configuration() {
   rtcData.config.nSamples = 0;
   rtcData.config.transmitFrequency = 0;
   rtcData.sync.calibrationFactor = 1.0;
+  rtcData.sync.syncTime = 0;
+  rtcData.sync.startTimeOfDay = 0;
 }
 
 

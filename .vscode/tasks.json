@@ -38,6 +38,7 @@
 				"-l:libgtest.a",
 				"-l:libgtest_main.a",
 				"-l:libstdc++.so",
+				"-lm",
 				"-pthread"
 			],
 			"options": {
