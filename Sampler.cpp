@@ -57,14 +57,27 @@ void Sampler::loop() {
         this->cbTransmit(data + this->n, this->t);
     }
     uint32_t nominalSleepTime = calculateSleepTime(counter);
-    this->configuration->incrementElapsed(nominalSleepTime);
+    unsigned long correctionTime = (unsigned long)(this->o*1000UL);
+    this->configuration->incrementElapsed(nominalSleepTime - correctionTime);
     this->configuration->save();
 
     unsigned long processingTime = millis() - initialTime;
-    unsigned long sleepTime = nominalSleepTime - ((unsigned long)(this->o*1000UL) + processingTime);
+    unsigned long sleepTime = nominalSleepTime - (correctionTime + processingTime);
     sleepTime = sleepTime < 0 ? 0: sleepTime;
     ESP.deepSleep((unsigned long)round(sleepTime*this->f)*1000UL, isTransmitDue(counter+1)?RF_DEFAULT:RF_DISABLED);
     this->setup();
+}
+
+void Sampler::synchronise(uint32_t timeInSeconds) {
+    uint32_t processingSeconds = (millis() - this->initialTime)/1000;
+    if (this->l != 0) {
+        float actualElapsed = timeInSeconds - (this->l + processingSeconds);
+        this->o = actualElapsed - this->e;
+        this->f *= (1.0 - this->o/actualElapsed);
+        this->configuration->resetSynchronisation(timeInSeconds - processingSeconds, this->f);
+    } else {
+        this->configuration->resetSynchronisation(timeInSeconds- processingSeconds, 1.0);
+    }
 }
 
 void Sampler::onTakeSample(SampleCallBack fnSample) {
@@ -109,15 +122,4 @@ bool Sampler::isSampleDue(int32_t c) {
 
 bool Sampler::isMeasurementDue(int32_t c) {
     return ((c - (int32_t)this->n) % (int32_t)this->y) == 0;
-}
-
-void Sampler::synchronise(uint32_t timeInSeconds) {
-    if (this->l != 0) {
-        float actualElapsed = timeInSeconds - this->l;
-        this->o = actualElapsed - this->e;
-        this->f *= (1.0 - this->o/actualElapsed);
-        this->configuration->resetSynchronisation(timeInSeconds, this->f);
-    } else {
-        this->configuration->resetSynchronisation(timeInSeconds, 1.0);
-    }
 }

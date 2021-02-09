@@ -11,7 +11,8 @@
                 "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/",
                 "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/**",
                 "/home/simon/Arduino/libraries/RTCMemory/**",
-                "/home/simon/Arduino/libraries/PubSubClient/**"
+                "/home/simon/Arduino/libraries/PubSubClient/**",
+                "/home/simon/Arduino/libraries/NTPClient/**"
              ],
              "forcedInclude": [],
              "browse": {
@@ -24,7 +25,8 @@
                     "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/",
                     "/home/simon/.arduino15/packages/esp8266/hardware/esp8266/2.7.4/cores/esp8266/**",
                     "/home/simon/Arduino/libraries/RTCMemory/**",
-                    "/home/simon/Arduino/libraries/PubSubClient/**"
+                    "/home/simon/Arduino/libraries/PubSubClient/**",
+                    "/home/simon/Arduino/libraries/NTPClient/**"
                      ]
              },
             "defines": [],

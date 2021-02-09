@@ -809,26 +809,26 @@ TEST_F(SamplerNtpSyncTest, RtcClockLagsBehindSyncedTime) {
     config.populateSynchronisation(&sync);
     ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90909090909);
     ASSERT_EQ(sync.syncTime,1612100440);
-    ASSERT_EQ(sync.nominalElapsed, 200);
-    //Assert sleeptime is 200 - 40 seconds*0.909090...
+    ASSERT_EQ(sync.nominalElapsed, 160);
+    //Assert sleeptime is 160 seconds*0.909090...
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 145455000);
 
     sampler.loop();
     config.populateSynchronisation(&sync);
     ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90909090909);
     ASSERT_EQ(sync.syncTime,1612100440);
-    ASSERT_EQ(sync.nominalElapsed, 400);
+    ASSERT_EQ(sync.nominalElapsed, 360);
     //Assert next sleep time is 200 * 0.909090909
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 181818000);
 
-    sampler.synchronise(1612100844);
+    sampler.synchronise(1612100804);
     sampler.loop();
     config.populateSynchronisation(&sync);
-    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.90009000900);
-    ASSERT_EQ(sync.syncTime,1612100844);
-    ASSERT_EQ(sync.nominalElapsed, 200);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 0.89910089910);
+    ASSERT_EQ(sync.syncTime,1612100804);
+    ASSERT_EQ(sync.nominalElapsed, 196);
     //Assert sleeptime is 200 - 4 seconds*0.900090...
-    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 176418000);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 176224000);
 
 }
 
@@ -859,7 +859,7 @@ TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTime) {
     config.populateSynchronisation(&sync);
     ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
     ASSERT_EQ(sync.syncTime,1612100360);
-    ASSERT_EQ(sync.nominalElapsed, 200);
+    ASSERT_EQ(sync.nominalElapsed, 240);
     //Assert sleeptime is 200 + 40 seconds*1.1111111...
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 266667000);
 
@@ -867,20 +867,76 @@ TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTime) {
     config.populateSynchronisation(&sync);
     ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
     ASSERT_EQ(sync.syncTime,1612100360);
-    ASSERT_EQ(sync.nominalElapsed, 400);
+    ASSERT_EQ(sync.nominalElapsed, 440);
     //Assert next sleep time is 200 * 0.909090909
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 222222000);
 
-    sampler.synchronise(1612100756);
+    sampler.synchronise(1612100796);
     sampler.loop();
     config.populateSynchronisation(&sync);
-    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.12233445566);
-    ASSERT_EQ(sync.syncTime,1612100756);
-    ASSERT_EQ(sync.nominalElapsed, 200);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.1213047910);
+    ASSERT_EQ(sync.syncTime,1612100796);
+    ASSERT_EQ(sync.nominalElapsed, 204);
     //Assert sleeptime is 200 + 4 seconds*1.12233445566...
-    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 228956000);
-
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 228746000);
 }
+
+
+TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeWithProcessingTime) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+    config.setParameters(200000,0,1,1);
+    ticks = 123;
+    sampler.setup();
+    sampler.synchronise(1612100000);
+
+    ticks = 2123;
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 200);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 198000000);
+
+    ticks = 4123;
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0);
+    ASSERT_EQ(sync.syncTime,1612100000);
+    ASSERT_EQ(sync.nominalElapsed, 400);
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 198000000);
+
+    ticks = 6123;
+    sampler.synchronise(1612100362);
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
+    ASSERT_EQ(sync.syncTime,1612100360);
+    ASSERT_EQ(sync.nominalElapsed, 240);
+    //Assert sleeptime is 200 + 40 -2 seconds*1.1111111...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 264444000);
+
+    ticks = 8123;
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.11111111);
+    ASSERT_EQ(sync.syncTime,1612100360);
+    ASSERT_EQ(sync.nominalElapsed, 440);
+    //Assert next sleep time is 200 -2 * 1.111111111
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 220000000);
+
+    ticks = 10123;
+    sampler.synchronise(1612100798);
+    sampler.loop();
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.1213047910);
+    ASSERT_EQ(sync.syncTime,1612100796);
+    ASSERT_EQ(sync.nominalElapsed, 204);
+    //Assert sleeptime is 200 + 4 -2  seconds*1.1213047910...
+    ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 226504000);
+}
+
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
