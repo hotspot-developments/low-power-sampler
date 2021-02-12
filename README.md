@@ -10,7 +10,7 @@ Paul found a simple water sensor that we could connect to a NodeMCU dev board th
 The ESP has a deepsleep facility. The great thing about deepsleep is that it consumes very little power. The drawback with deepsleep is the waking up - it does this via a reset, so that your program effectively starts from scratch with each wake. The only way I found to preserve some values between deepsleeps is to use some memory in the RTC hardware module<sup>3</sup>. So I divided the code into two modules; one to hold, update, save and retrieve the sampling configuration, and the second to use the configuration to work out when to invoke a sensor reading, and when to transmit values over the wifi.
 
 ### Configuration 
-As pool-sensor project took shape we realized that taking a single reading wasn't necessarily reliable. So we took 5 samples, and used the mode average to represent the measurement. The samples were taken at 5 second intervals and the resulting measurement transmitted to an MQTT server each hour. Note that we didn't really need hourly measurements, we could store those up and transmit, say, 6 hourly-measurments every 6 hours - saving even more battery.
+As pool-sensor project took shape we realized that taking a single reading wasn't necessarily reliable. So we took 5 samples, and used the mode average to represent the measurement. The samples were taken at 5 second intervals and the resulting measurement transmitted to an MQTT<sup>5</sup> server each hour. Note that we didn't really need hourly measurements, we could store those up and transmit, say, 6 hourly-measurements every 6 hours - saving even more battery.
 
 The Configuration class has a method to set the Sampling config:  
 ```
@@ -109,7 +109,7 @@ Note that the transmit callback is the only callback that is guaranteed to have 
 
 ## Usage
 ### Simplest Case
-Take a single sensor measurement every hour and send to server.
+Take a single sensor measurement every hour and send to server. This only requires the onTransmit callback to be defined.
 ```
     :
     :
@@ -152,6 +152,72 @@ void loop() {
   sampler.loop();   // Called once and then invokes a deepsleep.
 }
 ```
+### More complex case
+Take 5 sample readings 5 seconds apart once every 3 minutes use the mode of the 5 readings as our measurement. On the 10th occasion transmit the latest measurement to base.
+
+```
+    :
+    :
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+Configuration config;
+Sampler sampler(config);
+char msg[MSG_SIZE];          // buffer to hold outgoing debug/mqtt messages.
+    :
+    :
+uint16_t takeSample() {
+  Serial.printf("\nTaking sample... ");
+  return digitalRead(D6);
+}
+
+uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
+  Serial.printf("\nTaking measurement as mode... ");
+  int sum = 0;
+  for (int i=0; i < n; i++) sum += sample[i] > 0? 1: -1;
+  return (sum > 0)?1:0;
+}
+
+void transmit(uint16_t * measurement, uint32_t n) {
+  Serial.printf("\nCommunicating with base... ");
+  setupWifi();
+  setupMqtt();
+
+  uint16_t status = measurement[n-1];  // Just transmit the last measurement
+  float battery = analogRead(A0) / 1023.0;
+  unsigned version = config.getVersion();
+  snprintf (msg, 155, "firmware: %u, value: %hu, voltage: %f", version, status, battery*5.0);
+  mqttClient.publish(MQTT_OUT_TOPIC, msg);
+  mqttClient.disconnect();
+  Serial.println(msg);
+}
+
+void setup() {
+  pinMode(BUILTIN_LED, OUTPUT);     // Switch off the LED
+  digitalWrite(BUILTIN_LED,HIGH);
+  pinMode(D6, INPUT);
+  pinMode(A0, INPUT);
+  Serial.begin(115200);
+  config.setParameters(180000,5000,5,10);  // Default parameters - used first time round.
+  config.setVersion(VERSION);
+  sampler.setup();
+  sampler.onTakeSample(takeSample);
+  sampler.onTakeMeasurement(takeMeasurement);
+  sampler.onTransmit(transmit);
+  config.populateStatusMsg(msg, MSG_SIZE);
+  Serial.println(msg);
+}
+
+void loop() {
+  sampler.loop();
+}
+```
+## Coming soon
+-  Synchronise with an NTP server
+-  Update configuration via an MQTT JSON message
+-  Update the software over the air
+-  Use very small (sub-second) sample intervals, and delay rather than deepsleep.
+-  More verified examples
+-  Restructure in line with Arduino library
 
 ## References
 ### 1. OpenSprinkler 
@@ -160,5 +226,7 @@ https://opensprinkler.com/
 https://randomnerdtutorials.com/power-esp32-esp8266-solar-panels-battery-level-monitoring/
 ### 3. RTC User Memory example
 https://github.com/esp8266/Arduino/blob/master/libraries/esp8266/examples/RTCUserMemory/RTCUserMemory.ino
-### 4. MQTT Client
-  
+### 4. MQTT 
+https://mqtt.org/
+### 5. MQTT Client
+https://www.arduino.cc/reference/en/libraries/pubsubclient/
