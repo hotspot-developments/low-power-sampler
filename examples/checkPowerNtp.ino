@@ -1,5 +1,31 @@
+// This example is used to allow the monitoring of power consumption in each of the three modes
+// in which the low-power sampler operates:
+// - Deepsleep
+// - Active but with no WiFi
+// - Fully active with WiFi.
+// No sensor readings are taken in this example.
+// To give the WiFi something to do - an ntp server is used to synchronize the sampler.
+// The configuration ensures that there is a prolonged period in each mode (at least 15 seconds)
+// so that a multimeter can be employed to check power consumption.
+// Example figures I got for a NodeMCU ESP8266 development board:
+// - Deepsleep: 9mA
+// - Active no Wifi: 24mA
+// - Active with Wifi: 78mA
+// Configuration: take a measurement every 60 seconds and transmit every other one.
+// There is a 15 second busyish period in the measurement and transmit callbacks to allow for metering.
+// After the initial setup the programs should follow the following pattern
+// 15 seconds active no wifi
+// 45 seconds deepsleep
+// 30 seconds active with wifi
+// 30 seconds deepsleep
+// 15 seconds active no wifi
+// 45 seconds deepsleep
+// 30 seconds active with wifi
+// 30 seconds deepsleep
+// etc..etc..
+
+
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h>
 #include <WiFiUdp.h>
 
 #include "private.h"
@@ -11,16 +37,13 @@
 
 #define VERSION 100
 #define MS_DELAY_FOR_WIFI_CONNECTION  500
-#define MS_DELAY_FOR_MQTT_CONNECTION  500
-#define MS_DELAY_FOR_MQTT_RECEIVE     500
 #define MS_DELAY_FOR_NTP_RESPONSE     100
+#define MS_DELAY_FOR_BUSY_WAIT         10
 #define MS_WAIT_TIME_FOR_MESSAGES    5000
 #define MS_WAIT_TIME_FOR_WIFI        5000
-#define MS_WAIT_TIME_FOR_MQTT        5000
 
 WiFiClient espClient;
 WiFiUDP udpClient;
-PubSubClient mqttClient(espClient);
 Configuration config;
 Sampler sampler(config);
 char msg[MSG_SIZE];                   // buffer to hold outgoing debug/mqtt messages.
@@ -67,29 +90,6 @@ boolean setupNtp() {
   return ntpServerFound;
 }
 
-boolean setupMqtt() {
-  if (WiFi.status() != WL_CONNECTED) return false;
-  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-  // Loop until we're reconnected
-  int32_t waitTime = MS_WAIT_TIME_FOR_MQTT; 
-  boolean connected = false;
-  while (waitTime > 0 && !connected) {
-    waitTime -= MS_DELAY_FOR_MQTT_CONNECTION;
-    Serial.print("\nAttempting MQTT connection...");
-    // Attempt to connect
-    connected = mqttClient.connect(MQTT_CLIENT_ID);
-    if (connected) {
-      Serial.println("connected");
-      mqttClient.setCallback(mqttReceiveMsg);
-      mqttClient.subscribe(MQTT_IN_TOPIC);
-    } else {
-      Serial.printf("failed, rc=%d try again in %d ms",mqttClient.state(),MS_DELAY_FOR_MQTT_CONNECTION);
-      delay(MS_DELAY_FOR_MQTT_CONNECTION);
-    }
-  }
-  return connected;
-}
-
 void ntpReceiveMsg(byte* ntpBuffer) {
   unsigned long  NTPTime = 0 ;
   NTPTime |= (unsigned long) (ntpBuffer[40] << 24);
@@ -100,37 +100,12 @@ void ntpReceiveMsg(byte* ntpBuffer) {
   Serial.printf("NTP response received, time: %u\n", NTPTime);
 }
 
-void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
-  Serial.printf("\nMessage arrived on: %s:\n", topic);
-  char configJson[MAX_EXPECTED_CONFIG_STRING];
-  for (int i=0; i < length; i++) {
-    Serial.print((char) payload[i]);
-    configJson[i] = (char) payload[i];
-  }
-  configJson[length] =0;
-  config.fromJson(configJson);
-  config.populateStatusMsg(msg, MSG_SIZE);
-  Serial.println(msg);
-}
-
-uint16_t takeSample() {
-  Serial.printf("\nTaking sample... ");
-  return digitalRead(D6);
-}
-
-uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
-  Serial.printf("\nTaking measurement as mode... ");
-  int sum = 0;
-  for (int i=0; i < n; i++) sum += sample[i] > 0? 1: -1;
-  return (sum > 0)?1:0;
-}
-
 void waitForResponse() {
   int32_t waitTime = MS_WAIT_TIME_FOR_MESSAGES;
   boolean ntpReceived = false;
-  while(waitTime > 0) {
-    waitTime -= ntpReceived?MS_DELAY_FOR_MQTT_RECEIVE:MS_DELAY_FOR_NTP_RESPONSE;
-    delay(ntpReceived?MS_DELAY_FOR_MQTT_RECEIVE:MS_DELAY_FOR_NTP_RESPONSE);
+  while(waitTime > 0 && !ntpReceived) {
+    waitTime -= MS_DELAY_FOR_NTP_RESPONSE;
+    delay(MS_DELAY_FOR_NTP_RESPONSE);
     if (!ntpReceived) {
       ntpReceived = udpClient.parsePacket() >= NTP_PACKET_SIZE;
       if (ntpReceived) {
@@ -138,50 +113,43 @@ void waitForResponse() {
         ntpReceiveMsg(NTPBuffer);
       }
     }
-    mqttClient.loop();
   }
   Serial.println("Finished waiting for responses.");
+}
+
+void busyWaitMsFor(unsigned long n) {
+  unsigned long initial = millis();
+  while( (millis() - initial) < n) delay(MS_DELAY_FOR_BUSY_WAIT);
+}
+
+uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
+  uint32_t count = config.getCounter();
+  Serial.printf("\nTaking measurement %s wifi... ",count%2==0?"no":"with" );
+  busyWaitMsFor(15000);
+  Serial.printf("\nDone measurement. %s", count%2==0?"Going to deepsleep\n":"");
+  return 1;
 }
 
 void transmit(uint16_t * measurement, uint32_t n) {
   Serial.printf("\nCommunicating with base... ");
   setupWifi();
   setupNtp();
-  setupMqtt();
   waitForResponse();
-
-  uint16_t status = measurement[0];
-  float battery = analogRead(A0) / 1023.0;
-  unsigned version = config.getVersion();
-  snprintf (msg, 155, "firmware: %u, value: %hu, voltage: %f", version, status, battery*5.0);
-  mqttClient.publish(MQTT_OUT_TOPIC, msg);
-  mqttClient.disconnect();
-  Serial.println(msg);
+  busyWaitMsFor(15000);
+  Serial.printf("Done transmitting.\nGoing to deepsleep\n");
 }
 
 // ===============  Arduino Pattern ===================================================
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);     // Switch off the LED
+  pinMode(BUILTIN_LED, OUTPUT);            // Switch off the LED
   digitalWrite(BUILTIN_LED,HIGH);
-  pinMode(D6, INPUT);
-  pinMode(A0, INPUT);
   Serial.begin(115200);
-  config.setParameters(180000,5000,5,1);  // Default parameters - used first time round.
+  config.setParameters(60000,0,1,2);  // Default parameters - used first time round.
   config.setVersion(VERSION);
-  boolean isFirstTime = !config.checkMemory();
-  Serial.printf("\nSetup: configuration taken from %s.", !isFirstTime?"memory":"defaults");
+  Serial.printf("\nSetup: configuration taken from %s.", config.checkMemory()?"memory":"defaults");
   sampler.setup();
-  sampler.onTakeSample(takeSample);
   sampler.onTakeMeasurement(takeMeasurement);
   sampler.onTransmit(transmit);
-//  if (isFirstTime) {        
-//    setupWifi();
-//    setupNtp();
-//    setupMqtt();
-//    waitForResponse();
-//    mqttClient.disconnect();
-//    udpClient.stopAll();
-//  }
   config.populateStatusMsg(msg, MSG_SIZE);
   Serial.println(msg);
 }
