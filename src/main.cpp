@@ -26,6 +26,28 @@ Sampler sampler(config);
 char msg[MSG_SIZE];                   // buffer to hold outgoing debug/mqtt messages.
 byte NTPBuffer[NTP_PACKET_SIZE];      // buffer to hold incoming and outgoing ntp packets.
 IPAddress timeServerIP;               // IP address of NTP server.
+void ntpReceiveMsg(byte* ntpBuffer) {
+  unsigned long  NTPTime = 0 ;
+  NTPTime |= (unsigned long) (ntpBuffer[40] << 24);
+  NTPTime |= (unsigned long)(ntpBuffer[41] << 16);
+  NTPTime |= (unsigned long)(ntpBuffer[42] << 8); 
+  NTPTime |= (unsigned long) ntpBuffer[43]; 
+  sampler.synchronise(NTPTime); 
+  Serial.printf("NTP response received, time: %u\n", NTPTime);
+}
+
+void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
+  Serial.printf("\nMessage arrived on: %s:\n", topic);
+  char configJson[MAX_EXPECTED_CONFIG_STRING];
+  for (int i=0; i < length; i++) {
+    Serial.print((char) payload[i]);
+    configJson[i] = (char) payload[i];
+  }
+  configJson[length] =0;
+  config.fromJson(configJson);
+  config.populateStatusMsg(msg, MSG_SIZE);
+  Serial.println(msg);
+}
 
 boolean setupWifi() {
   Serial.printf("\nConnecting to: %s ..", WIFI_SSID);
@@ -90,29 +112,6 @@ boolean setupMqtt() {
   return connected;
 }
 
-void ntpReceiveMsg(byte* ntpBuffer) {
-  unsigned long  NTPTime = 0 ;
-  NTPTime |= (unsigned long) (ntpBuffer[40] << 24);
-  NTPTime |= (unsigned long)(ntpBuffer[41] << 16);
-  NTPTime |= (unsigned long)(ntpBuffer[42] << 8); 
-  NTPTime |= (unsigned long) ntpBuffer[43]; 
-  sampler.synchronise(NTPTime); 
-  Serial.printf("NTP response received, time: %u\n", NTPTime);
-}
-
-void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
-  Serial.printf("\nMessage arrived on: %s:\n", topic);
-  char configJson[MAX_EXPECTED_CONFIG_STRING];
-  for (int i=0; i < length; i++) {
-    Serial.print((char) payload[i]);
-    configJson[i] = (char) payload[i];
-  }
-  configJson[length] =0;
-  config.fromJson(configJson);
-  config.populateStatusMsg(msg, MSG_SIZE);
-  Serial.println(msg);
-}
-
 uint16_t takeSample() {
   Serial.printf("\nTaking sample... ");
   return digitalRead(D6);
@@ -174,14 +173,6 @@ void setup() {
   sampler.onTakeSample(takeSample);
   sampler.onTakeMeasurement(takeMeasurement);
   sampler.onTransmit(transmit);
-//  if (isFirstTime) {        
-//    setupWifi();
-//    setupNtp();
-//    setupMqtt();
-//    waitForResponse();
-//    mqttClient.disconnect();
-//    udpClient.stopAll();
-//  }
   config.populateStatusMsg(msg, MSG_SIZE);
   Serial.println(msg);
 }

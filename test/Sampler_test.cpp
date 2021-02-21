@@ -1,7 +1,8 @@
 #include <gtest/gtest.h>
-#include "../Configuration.cpp"
-#include "../Sampler.cpp"
 #include "./fake/Esp.h"
+#include "../src/Configuration.cpp"
+#include "../src/Sampler.cpp"
+
 
 
 #define ASSERT_TAKE_SAMPLE_NOT_CALLED() ASSERT_FALSE(SamplerTest::sampleCalled);
