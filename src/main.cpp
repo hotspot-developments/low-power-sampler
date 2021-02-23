@@ -33,13 +33,13 @@ void ntpReceiveMsg(byte* ntpBuffer) {
   NTPTime |= (unsigned long)(ntpBuffer[42] << 8); 
   NTPTime |= (unsigned long) ntpBuffer[43]; 
   sampler.synchronise(NTPTime); 
-  Serial.printf("NTP response received, time: %u\n", NTPTime);
+  Serial.printf("NTP response received, time: %lu\n", NTPTime);
 }
 
 void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
   Serial.printf("\nMessage arrived on: %s:\n", topic);
   char configJson[MAX_EXPECTED_CONFIG_STRING];
-  for (int i=0; i < length; i++) {
+  for (unsigned int i=0; i < length; i++) {
     Serial.print((char) payload[i]);
     configJson[i] = (char) payload[i];
   }
@@ -120,7 +120,7 @@ uint16_t takeSample() {
 uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
   Serial.printf("\nTaking measurement as mode... ");
   int sum = 0;
-  for (int i=0; i < n; i++) sum += sample[i] > 0? 1: -1;
+  for (unsigned int i=0; i < n; i++) sum += sample[i] > 0? 1: -1;
   return (sum > 0)?1:0;
 }
 
@@ -149,10 +149,14 @@ void transmit(uint16_t * measurement, uint32_t n) {
   setupMqtt();
   waitForResponse();
 
-  uint16_t status = measurement[0];
   float battery = analogRead(A0) / 1023.0;
   unsigned version = config.getVersion();
-  snprintf (msg, 155, "firmware: %u, value: %hu, voltage: %f", version, status, battery*5.0);
+  int nchars = snprintf (msg, MSG_SIZE, "firmware: %u, values:[", version);
+  nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, "%hu", measurement[0]);
+  for (unsigned int i=1; i < n; i++) {
+      nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, ",%hu", measurement[i]);
+  }
+  snprintf(msg+nchars, MSG_SIZE - nchars,"], voltage: %f",  battery*5.0);
   mqttClient.publish(MQTT_OUT_TOPIC, msg);
   mqttClient.disconnect();
   Serial.println(msg);
@@ -160,12 +164,12 @@ void transmit(uint16_t * measurement, uint32_t n) {
 
 // ===============  Arduino Pattern ===================================================
 void setup() {
-  pinMode(BUILTIN_LED, OUTPUT);     // Switch off the LED
-  digitalWrite(BUILTIN_LED,HIGH);
+  pinMode(LED_BUILTIN, OUTPUT);     // Switch off the LED
+  digitalWrite(LED_BUILTIN,HIGH);
   pinMode(D6, INPUT);
   pinMode(A0, INPUT);
   Serial.begin(115200);
-  config.setParameters(180000,5000,5,1);  // Default parameters - used first time round.
+  config.setParameters(10800000,5000,5,8);  // Default parameters - used first time round.
   config.setVersion(VERSION);
   boolean isFirstTime = !config.checkMemory();
   Serial.printf("\nSetup: configuration taken from %s.", !isFirstTime?"memory":"defaults");

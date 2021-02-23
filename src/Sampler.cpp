@@ -61,7 +61,7 @@ void Sampler::loop() {
     this->configuration->incrementElapsed(nominalSleepTime - correctionTime);
     this->configuration->save();
 
-    unsigned long processingTime = millis() - initialTime;
+    unsigned long processingTime = millis() - this->initialTime;
     unsigned long sleepTime = nominalSleepTime - (correctionTime + processingTime);
     sleepTime = sleepTime < 0 ? 0: sleepTime;
     ESP.deepSleep((unsigned long)round(sleepTime*this->f)*1000UL, isTransmitDue(counter+1)?RF_DEFAULT:RF_DISABLED);
@@ -117,7 +117,7 @@ bool Sampler::isTransmitDue(int32_t c) {
 }
 
 bool Sampler::isSampleDue(int32_t c) {
-    return ((c - 1) % (int32_t)this->y ) < this->n;
+    return ((c - 1) % (int32_t)this->y ) < (int32_t)this->n;
 }
 
 bool Sampler::isMeasurementDue(int32_t c) {

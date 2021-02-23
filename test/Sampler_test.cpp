@@ -4,7 +4,6 @@
 #include "../src/Sampler.cpp"
 
 
-
 #define ASSERT_TAKE_SAMPLE_NOT_CALLED() ASSERT_FALSE(SamplerTest::sampleCalled);
 #define ASSERT_TAKE_MEASUREMENT_NOT_CALLED() ASSERT_FALSE(SamplerTest::measurementCalled);
 #define ASSERT_TRANSMIT_NOT_CALLED() ASSERT_FALSE(SamplerTest::transmitCalled);

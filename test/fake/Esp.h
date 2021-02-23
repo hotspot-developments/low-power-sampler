@@ -84,6 +84,7 @@ typedef enum {
      FM_UNKNOWN = 0xff
 } FlashMode_t;
 
+#define clockCyclesPerMicrosecond() ( F_CPU / 1000000L )
 
 class EspClass {
     private:
