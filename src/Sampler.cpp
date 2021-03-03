@@ -1,11 +1,10 @@
 #include "Sampler.h"
 #include <limits.h>
-#include <Esp.h>
 #include <math.h>
+#include "Espx.h"
+#include <Arduino.h>
 
 #define MAX_SLEEP_TIME_MS 3600000
-
-unsigned long millis();
 
 Sampler::Sampler(Configuration& config) {
     this->configuration = &config;
@@ -57,14 +56,13 @@ void Sampler::loop() {
         this->cbTransmit(data + this->n, this->t);
     }
     uint32_t nominalSleepTime = calculateSleepTime(counter);
-    unsigned long correctionTime = (unsigned long)(this->o*1000UL);
+    long correctionTime = (long)(this->o*1000UL);
     this->configuration->incrementElapsed(nominalSleepTime - correctionTime);
     this->configuration->save();
 
-    unsigned long processingTime = millis() - this->initialTime;
-    unsigned long sleepTime = nominalSleepTime - (correctionTime + processingTime);
-    sleepTime = sleepTime < 0 ? 0: sleepTime;
-    ESP.deepSleep((unsigned long)round(sleepTime*this->f)*1000UL, isTransmitDue(counter+1)?RF_DEFAULT:RF_DISABLED);
+    correctionTime += millis() - this->initialTime;
+    unsigned long sleepTime = correctionTime > nominalSleepTime ? 0 : nominalSleepTime - correctionTime;
+    Espx::deepSleep((unsigned long)round(sleepTime*this->f)*1000UL, isTransmitDue(counter+1));
     this->setup();
 }
 

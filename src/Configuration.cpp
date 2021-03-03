@@ -2,7 +2,8 @@
 
 #include <cstdio>
 #include <ctype.h>
-#include <Esp.h>
+#include <string.h>
+#include "Espx.h"
 
 #include "Configuration.h"
 
@@ -147,8 +148,8 @@ void Configuration::fromJson(const char * json) {
 bool Configuration::checkMemory() {
   uint32_t crc32;
   Parameters params;
-  if (ESP.rtcUserMemoryRead(OTA_OFFSET, &crc32, sizeof(crc32)) &&
-      ESP.rtcUserMemoryRead(OTA_OFFSET + 1, (uint32_t*) &params, sizeof(params))) {
+  if (Espx::rtcUserMemoryRead(OTA_OFFSET, &crc32, sizeof(crc32)) &&
+      Espx::rtcUserMemoryRead(OTA_OFFSET + 1, (uint32_t*) &params, sizeof(params))) {
     uint32_t crcOfParams = calculateCRC32((uint8_t*) &params, sizeof(params));
     return crcOfParams == crc32;
   }
@@ -156,7 +157,7 @@ bool Configuration::checkMemory() {
 }
 
 bool Configuration::fromMemory() {
-  if (ESP.rtcUserMemoryRead(OTA_OFFSET, (uint32_t*) &rtcData, sizeof(rtcData))) {
+  if (Espx::rtcUserMemoryRead(OTA_OFFSET, (uint32_t*) &rtcData, sizeof(rtcData))) {
     uint32_t crcOfConfig = calculateCRC32((uint8_t*) &rtcData.config, sizeof(rtcData.config));
     return crcOfConfig == rtcData.crc32;
   }
@@ -165,7 +166,7 @@ bool Configuration::fromMemory() {
 
 bool Configuration::save() {
   rtcData.crc32 = calculateCRC32((uint8_t*) &rtcData.config, sizeof(rtcData.config));
-  return ESP.rtcUserMemoryWrite(OTA_OFFSET, &rtcData.crc32, sizeof(rtcData) );
+  return Espx::rtcUserMemoryWrite(OTA_OFFSET, &rtcData.crc32, sizeof(rtcData) );
 }
 
 

@@ -27,7 +27,13 @@
 // Its only the events that invoke transmit that have the Wifi enabled, which can be verified by following 
 // the Serial debug statements.
 
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#define SENSOR_PIN D6
+#else
+#include <WiFi.h>
+#define SENSOR_PIN 34
+#endif
 
 #include "private.h"
 #include "Configuration.h"

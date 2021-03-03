@@ -1,5 +1,9 @@
+#define ESP8266
+#define Arduino_h
+
 #include <gtest/gtest.h>
 #include "./fake/Esp.h"
+#include "../src/Espx.cpp"
 #include "../src/Configuration.cpp"
 #include "../src/Sampler.cpp"
 
@@ -97,12 +101,27 @@ class SamplerTest : public testing::Test {
     }    
 };
 
+
 class SamplerNtpSyncTest: public testing::Test {
+
+    public:
+    static unsigned long presyncMillis;
+    static unsigned long postsyncMillis;
+    static uint32_t syncTimeSeconds;
+    static Sampler *sampler;
+
+    static void transmit(uint16_t* measurements, uint32_t nMeasurements) {
+        ticks = SamplerNtpSyncTest::presyncMillis;
+        SamplerNtpSyncTest::sampler->synchronise(SamplerNtpSyncTest::syncTimeSeconds);
+        ticks = SamplerNtpSyncTest::postsyncMillis;
+    }
+
 
     protected:
     virtual void SetUp() {
         uint32_t BadNumber = 0xDEADDEAD;
         ESP.rtcUserMemoryWrite(OTA_OFFSET, &BadNumber, 4);
+        SamplerNtpSyncTest::sampler = NULL;
     }
 
     virtual void TearDown() {}
@@ -118,6 +137,10 @@ uint16_t SamplerTest::returnedMeasurement ;
 bool SamplerTest::sampleCalled;
 bool SamplerTest::measurementCalled;
 bool SamplerTest::transmitCalled;
+unsigned long SamplerNtpSyncTest::presyncMillis;
+unsigned long SamplerNtpSyncTest::postsyncMillis;
+uint32_t SamplerNtpSyncTest::syncTimeSeconds;
+Sampler* SamplerNtpSyncTest::sampler;
 
 
 TEST_F(SamplerTest, SetupLoadValidConfigFromMemory) {
@@ -937,6 +960,30 @@ TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeWithProcessingTime) {
     ASSERT_EQ(ESP.getSleepTime(), (uint64_t) 226504000);
 }
 
+
+
+TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeLoop) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+    config.setParameters(100000,10000,5,2);
+    SamplerNtpSyncTest::presyncMillis = 4000;
+    SamplerNtpSyncTest::postsyncMillis = 6000;
+    SamplerNtpSyncTest::sampler = &sampler;
+    sampler.onTransmit(&SamplerNtpSyncTest::transmit);
+    uint32_t time = 3825000000;
+    for (int i=1; i <= 120; i++) {
+        ticks=0;
+        sampler.setup();
+        SamplerNtpSyncTest::presyncMillis = 4000;
+        SamplerNtpSyncTest::postsyncMillis = 6000;
+        SamplerNtpSyncTest::syncTimeSeconds = time + 4;
+        sampler.loop();
+        time += millis() /1000UL;
+        time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 1.1) /1000000UL);
+    }
+    ASSERT_EQ(time, 3825002414);
+}
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);

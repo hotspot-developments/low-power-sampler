@@ -1,4 +1,10 @@
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#define SENSOR_PIN D6
+#else
+#include <WiFi.h>
+#define SENSOR_PIN 34
+#endif
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 
@@ -10,13 +16,13 @@
 #define NTP_PACKET_SIZE 48
 
 #define VERSION 100
-#define MS_DELAY_FOR_WIFI_CONNECTION  500
-#define MS_DELAY_FOR_MQTT_CONNECTION  500
-#define MS_DELAY_FOR_MQTT_RECEIVE     500
-#define MS_DELAY_FOR_NTP_RESPONSE     100
-#define MS_WAIT_TIME_FOR_MESSAGES    5000
-#define MS_WAIT_TIME_FOR_WIFI        5000
-#define MS_WAIT_TIME_FOR_MQTT        5000
+#define MS_DELAY_FOR_WIFI_CONNECTION   500
+#define MS_DELAY_FOR_MQTT_CONNECTION   500
+#define MS_DELAY_FOR_MQTT_RECEIVE      500
+#define MS_DELAY_FOR_NTP_RESPONSE      100
+#define MS_WAIT_TIME_FOR_MESSAGES    10000
+#define MS_WAIT_TIME_FOR_WIFI        10000
+#define MS_WAIT_TIME_FOR_MQTT        10000
 
 WiFiClient espClient;
 WiFiUDP udpClient;
@@ -26,6 +32,7 @@ Sampler sampler(config);
 char msg[MSG_SIZE];                   // buffer to hold outgoing debug/mqtt messages.
 byte NTPBuffer[NTP_PACKET_SIZE];      // buffer to hold incoming and outgoing ntp packets.
 IPAddress timeServerIP;               // IP address of NTP server.
+
 void ntpReceiveMsg(byte* ntpBuffer) {
   unsigned long  NTPTime = 0 ;
   NTPTime |= (unsigned long) (ntpBuffer[40] << 24);
@@ -53,10 +60,9 @@ boolean setupWifi() {
   Serial.printf("\nConnecting to: %s ..", WIFI_SSID);
   WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
 
-  int32_t waitTime = MS_WAIT_TIME_FOR_WIFI; 
+  int32_t waitUntil = millis() + MS_WAIT_TIME_FOR_WIFI; 
   boolean connected = WiFi.status() == WL_CONNECTED;
-  while (waitTime > 0 && !connected) {
-    waitTime -= MS_DELAY_FOR_WIFI_CONNECTION;
+  while (millis() < waitUntil && !connected) {
     delay(MS_DELAY_FOR_WIFI_CONNECTION);
     Serial.print(".");
     connected = WiFi.status() == WL_CONNECTED;
@@ -72,8 +78,6 @@ boolean setupNtp() {
   if (WiFi.status() != WL_CONNECTED) return false;
   Serial.println("Starting UDP");
   udpClient.begin(123);                          // Start listening for UDP messages on port 123
-  Serial.print("Local port:\t");
-  Serial.println(udpClient.localPort());
 
   boolean ntpServerFound = WiFi.hostByName(NTP_SERVER_NAME, timeServerIP);
   if(ntpServerFound) {  
@@ -93,11 +97,10 @@ boolean setupMqtt() {
   if (WiFi.status() != WL_CONNECTED) return false;
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   // Loop until we're reconnected
-  int32_t waitTime = MS_WAIT_TIME_FOR_MQTT; 
+  int32_t waitUntil = millis() + MS_WAIT_TIME_FOR_MQTT; 
   boolean connected = false;
-  while (waitTime > 0 && !connected) {
-    waitTime -= MS_DELAY_FOR_MQTT_CONNECTION;
-    Serial.print("\nAttempting MQTT connection...");
+  while (millis() < waitUntil && !connected) {
+    Serial.print("Attempting MQTT connection...");
     // Attempt to connect
     connected = mqttClient.connect(MQTT_CLIENT_ID);
     if (connected) {
@@ -114,7 +117,7 @@ boolean setupMqtt() {
 
 uint16_t takeSample() {
   Serial.printf("\nTaking sample... ");
-  return digitalRead(D6);
+  return digitalRead(SENSOR_PIN);
 }
 
 uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
@@ -124,52 +127,58 @@ uint16_t takeMeasurement(uint16_t * sample, uint32_t n) {
   return (sum > 0)?1:0;
 }
 
-void waitForResponse() {
-  int32_t waitTime = MS_WAIT_TIME_FOR_MESSAGES;
-  boolean ntpReceived = false;
-  while(waitTime > 0) {
-    waitTime -= ntpReceived?MS_DELAY_FOR_MQTT_RECEIVE:MS_DELAY_FOR_NTP_RESPONSE;
-    delay(ntpReceived?MS_DELAY_FOR_MQTT_RECEIVE:MS_DELAY_FOR_NTP_RESPONSE);
-    if (!ntpReceived) {
-      ntpReceived = udpClient.parsePacket() >= NTP_PACKET_SIZE;
-      if (ntpReceived) {
+void waitForResponse(bool ntpRequired, bool mqttRequired) {
+  int32_t waitUntil = millis() + MS_WAIT_TIME_FOR_MESSAGES;
+  Serial.printf("\nCheck responses %s ",ntpRequired && mqttRequired? "" : (ntpRequired? "for NTP": "for MQTT"));
+  while(millis() < waitUntil && (ntpRequired || mqttRequired)) {
+    if (ntpRequired) {
+      if (udpClient.parsePacket() >= NTP_PACKET_SIZE) {
         udpClient.read(NTPBuffer, NTP_PACKET_SIZE);
         ntpReceiveMsg(NTPBuffer);
+        ntpRequired = false;
       }
     }
-    mqttClient.loop();
+    if (mqttRequired) mqttClient.loop();
+    if (ntpRequired || mqttRequired) {
+      Serial.printf("%c", ntpRequired && mqttRequired?'.':(ntpRequired?'n':'m'));
+      delay(ntpRequired?MS_DELAY_FOR_NTP_RESPONSE:MS_DELAY_FOR_MQTT_RECEIVE);
+    }
   }
-  Serial.println("Finished waiting for responses.");
+  Serial.println("\nFinished waiting for responses.");
 }
 
 void transmit(uint16_t * measurement, uint32_t n) {
   Serial.printf("\nCommunicating with base... ");
   setupWifi();
-  setupNtp();
-  setupMqtt();
-  waitForResponse();
+  bool ntpInitiated = setupNtp();
+  bool mqttConnected = setupMqtt();
 
-  float battery = analogRead(A0) / 1023.0;
+  float battery = analogRead(A0) / 4096.0;
   unsigned version = config.getVersion();
   int nchars = snprintf (msg, MSG_SIZE, "firmware: %u, values:[", version);
   nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, "%hu", measurement[0]);
   for (unsigned int i=1; i < n; i++) {
-      nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, ",%hu", measurement[i]);
+    nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, ",%hu", measurement[i]);
   }
-  snprintf(msg+nchars, MSG_SIZE - nchars,"], voltage: %f",  battery*5.0);
-  mqttClient.publish(MQTT_OUT_TOPIC, msg);
-  mqttClient.disconnect();
-  Serial.println(msg);
+  snprintf(msg+nchars, MSG_SIZE - nchars,"], voltage: %f",  battery*3.3 );
+  if (mqttConnected) {
+    bool published = mqttClient.publish(MQTT_OUT_TOPIC, msg);
+    Serial.printf("Publish %s: %s", published?"succeeded":"failed", msg);
+  } else {
+    Serial.println("Could not publish to mqtt");
+  }
+  waitForResponse(ntpInitiated, mqttConnected);
+  if (mqttConnected)  mqttClient.disconnect();
 }
 
 // ===============  Arduino Pattern ===================================================
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);     // Switch off the LED
   digitalWrite(LED_BUILTIN,HIGH);
-  pinMode(D6, INPUT);
+  pinMode(SENSOR_PIN, INPUT);
   pinMode(A0, INPUT);
   Serial.begin(115200);
-  config.setParameters(10800000,5000,5,8);  // Default parameters - used first time round.
+  config.setParameters(180000,5000,5,1);  // Default parameters - used first time round.
   config.setVersion(VERSION);
   boolean isFirstTime = !config.checkMemory();
   Serial.printf("\nSetup: configuration taken from %s.", !isFirstTime?"memory":"defaults");

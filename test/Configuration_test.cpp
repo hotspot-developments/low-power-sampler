@@ -1,5 +1,9 @@
+#define ESP8266
+#define Arduino_h
+
 #include <gtest/gtest.h>
 #include "./fake/Esp.h"
+#include "../src/Espx.cpp"
 #include "../src/Configuration.cpp"
 
 

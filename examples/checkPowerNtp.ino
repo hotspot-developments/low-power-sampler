@@ -25,7 +25,13 @@
 // etc..etc..
 
 
+#if defined(ESP8266)
 #include <ESP8266WiFi.h>
+#define SENSOR_PIN D6
+#else
+#include <WiFi.h>
+#define SENSOR_PIN 34
+#endif
 #include <WiFiUdp.h>
 
 #include "private.h"
@@ -73,8 +79,6 @@ boolean setupNtp() {
   if (WiFi.status() != WL_CONNECTED) return false;
   Serial.println("Starting UDP");
   udpClient.begin(123);                          // Start listening for UDP messages on port 123
-  Serial.print("Local port:\t");
-  Serial.println(udpClient.localPort());
 
   boolean ntpServerFound = WiFi.hostByName(NTP_SERVER_NAME, timeServerIP);
   if(ntpServerFound) {  
@@ -97,7 +101,7 @@ void ntpReceiveMsg(byte* ntpBuffer) {
   NTPTime |= (unsigned long)(ntpBuffer[42] << 8); 
   NTPTime |= (unsigned long) ntpBuffer[43]; 
   sampler.synchronise(NTPTime); 
-  Serial.printf("NTP response received, time: %u\n", NTPTime);
+  Serial.printf("NTP response received, time: %lu\n", NTPTime);
 }
 
 void waitForResponse() {
