@@ -24,6 +24,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdarg.h>
 
 /**
  * AVR macros for WDT managment
@@ -85,6 +86,13 @@ typedef enum {
 } FlashMode_t;
 
 #define clockCyclesPerMicrosecond() ( F_CPU / 1000000L )
+
+class SerialFake {
+    public:
+        void printf(const char* format, ...);
+};
+
+void SerialFake::printf(const char* format, ...) {};
 
 class EspClass {
     private:
@@ -208,7 +216,7 @@ uint64_t EspClass::getSleepTime() {
 RFMode EspClass::getSleepMode() {
     return this->sleepMode;
 }
-
+SerialFake Serial;
 EspClass ESP;
 
 unsigned long ticks = 0;

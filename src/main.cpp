@@ -160,7 +160,12 @@ void transmit(uint16_t * measurement, uint32_t n) {
   for (unsigned int i=1; i < n; i++) {
     nchars+= snprintf(msg+nchars, MSG_SIZE - nchars, ",%hu", measurement[i]);
   }
-  snprintf(msg+nchars, MSG_SIZE - nchars,"], voltage: %f",  battery*3.3 );
+  nchars += snprintf(msg+nchars, MSG_SIZE - nchars,"], voltage: %f",  battery*3.3 );
+  Synchronisation sync; Parameters params;
+  config.populateSynchronisation(&sync);
+  config.populateParameters(&params);
+  snprintf(msg +nchars, MSG_SIZE - nchars, " counter: %hu, syncTime: %u, nominal: %u, factor: %f", 
+            params.counter, sync.syncTime, sync.nominalElapsed, sync.calibrationFactor);
   if (mqttConnected) {
     bool published = mqttClient.publish(MQTT_OUT_TOPIC, msg);
     Serial.printf("Publish %s: %s", published?"succeeded":"failed", msg);

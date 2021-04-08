@@ -108,12 +108,15 @@ class SamplerNtpSyncTest: public testing::Test {
     static unsigned long presyncMillis;
     static unsigned long postsyncMillis;
     static uint32_t syncTimeSeconds;
+    static bool doSync;
     static Sampler *sampler;
 
     static void transmit(uint16_t* measurements, uint32_t nMeasurements) {
-        ticks = SamplerNtpSyncTest::presyncMillis;
-        SamplerNtpSyncTest::sampler->synchronise(SamplerNtpSyncTest::syncTimeSeconds);
-        ticks = SamplerNtpSyncTest::postsyncMillis;
+        ticks += SamplerNtpSyncTest::presyncMillis;
+        if (SamplerNtpSyncTest::doSync) {
+            SamplerNtpSyncTest::sampler->synchronise(SamplerNtpSyncTest::syncTimeSeconds);
+        }
+        ticks += SamplerNtpSyncTest::postsyncMillis;
     }
 
 
@@ -141,7 +144,7 @@ unsigned long SamplerNtpSyncTest::presyncMillis;
 unsigned long SamplerNtpSyncTest::postsyncMillis;
 uint32_t SamplerNtpSyncTest::syncTimeSeconds;
 Sampler* SamplerNtpSyncTest::sampler;
-
+bool SamplerNtpSyncTest::doSync;
 
 TEST_F(SamplerTest, SetupLoadValidConfigFromMemory) {
     Configuration config;
@@ -966,10 +969,11 @@ TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeLoop) {
     Configuration config;
     Sampler sampler(config);
     Synchronisation sync;
-    config.setParameters(100000,10000,5,2);
+    config.setParameters(100000,10000,5,1);
     SamplerNtpSyncTest::presyncMillis = 4000;
     SamplerNtpSyncTest::postsyncMillis = 6000;
     SamplerNtpSyncTest::sampler = &sampler;
+    SamplerNtpSyncTest::doSync = true;
     sampler.onTransmit(&SamplerNtpSyncTest::transmit);
     uint32_t time = 3825000000;
     for (int i=1; i <= 120; i++) {
@@ -982,7 +986,104 @@ TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeLoop) {
         time += millis() /1000UL;
         time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 1.1) /1000000UL);
     }
-    ASSERT_EQ(time, 3825002414);
+    ASSERT_EQ(time, 3825002404);
+}
+
+TEST_F(SamplerNtpSyncTest, RtcClockRunsBehindSyncedTimeLoop) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+    config.setParameters(100000,10000,5,1);
+    SamplerNtpSyncTest::presyncMillis = 4000;
+    SamplerNtpSyncTest::postsyncMillis = 6000;
+    SamplerNtpSyncTest::sampler = &sampler;
+    SamplerNtpSyncTest::doSync = true;
+    sampler.onTransmit(&SamplerNtpSyncTest::transmit);
+    uint32_t time = 3825000000;
+    for (int i=1; i <= 120; i++) {
+        ticks=0;
+        sampler.setup();
+        SamplerNtpSyncTest::presyncMillis = 4000;
+        SamplerNtpSyncTest::postsyncMillis = 6000;
+        SamplerNtpSyncTest::syncTimeSeconds = time + 4;
+        sampler.loop();
+        time += millis() /1000UL;
+        time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 0.9) /1000000UL);
+    }
+    ASSERT_EQ(time, 3825002396);
+}
+
+
+TEST_F(SamplerNtpSyncTest, RtcClockRunsAheadOfSyncedTimeByMoreThanInterval) {
+    Configuration config;
+    Sampler sampler(config);
+    Synchronisation sync;
+    config.setParameters(10000,0,1,1);
+    SamplerNtpSyncTest::presyncMillis = 4000;
+    SamplerNtpSyncTest::postsyncMillis = 6000;
+    SamplerNtpSyncTest::sampler = &sampler;
+    SamplerNtpSyncTest::doSync = true;
+    sampler.onTransmit(&SamplerNtpSyncTest::transmit);
+    SamplerNtpSyncTest::presyncMillis = 2000;
+    SamplerNtpSyncTest::postsyncMillis = 3000;
+
+    uint32_t time = 3825000000;
+    for (int i=1; i <= 2; i++) {
+        ticks=0;
+        sampler.setup();
+        SamplerNtpSyncTest::syncTimeSeconds = time + 2;
+        sampler.loop();
+        time += millis() /1000UL;
+        time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 0.9) /1000000UL);
+    }
+    ASSERT_EQ(time, 3825000020);
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.111111111);
+
+    SamplerNtpSyncTest::doSync = false;
+    for (int i=1; i <= 12; i++) {
+        ticks=0;
+        sampler.setup();
+        SamplerNtpSyncTest::syncTimeSeconds = time + 2;
+        sampler.loop();
+        time += millis() /1000UL;
+        time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 1.111111111) /1000000UL);
+    }
+    ASSERT_EQ(time, 3825000152);
+    config.populateSynchronisation(&sync);
+    ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.111111111);
+
+    SamplerNtpSyncTest::doSync = true;
+    ticks=0;
+    sampler.setup();
+    SamplerNtpSyncTest::syncTimeSeconds = time + 2;
+    sampler.loop();
+    time += millis() /1000UL;
+    time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 1.111111111) /1000000UL);
+
+    config.populateSynchronisation(&sync);
+    ASSERT_EQ(sync.nominalElapsed,0);
+    ASSERT_EQ(time, 3825000157);
+
+    ticks=0;
+    sampler.setup();
+    SamplerNtpSyncTest::syncTimeSeconds = time + 2;
+    sampler.loop();
+    time += millis() /1000UL;
+    time += (uint32_t)((unsigned long)round(ESP.getSleepTime() * 1.111111111) /1000000UL);
+
+    config.populateSynchronisation(&sync);
+
+    ASSERT_EQ(sync.nominalElapsed,10);
+    ASSERT_EQ(time, 3825000167);
+}
+
+TEST_F(SamplerNtpSyncTest, CheckCasting) {
+    long correction = -52502;
+    uint32_t nominal = 160000;
+    ASSERT_EQ((correction > nominal)? 0 : (nominal - correction), (uint32_t)212502);
+    unsigned long sleepTime = (correction > nominal) ? 0 : (nominal - correction);
+    ASSERT_FALSE(sleepTime == 0);
 }
 
 int main(int argc, char** argv) {

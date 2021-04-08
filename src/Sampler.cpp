@@ -12,8 +12,6 @@ Sampler::Sampler(Configuration& config) {
 }
 
 void Sampler::setup() {
-    Parameters params;
-    Synchronisation sync;
     this->initialTime = millis();
     if (this->configuration->checkMemory()) {
         this->configuration->fromMemory();
@@ -23,17 +21,10 @@ void Sampler::setup() {
     }
     this->configuration->populateParameters(&params);
     this->configuration->populateSynchronisation(&sync);
-    this->n = params.nSamples;
-    this->t = params.transmitFrequency;
     this->d = ((params.measurementInterval - 1) / MAX_SLEEP_TIME_MS) + 1;
     this->y = params.nSamples + this->d - 1;
     this->x = params.transmitFrequency * this->y;
-    this->m = params.measurementInterval;
-    this->s = params.sampleInterval;
-    this->l = sync.syncTime;
-    this->e = sync.nominalElapsed;
-    this->f = sync.calibrationFactor;
-    this->o = 0.0;
+    this->offset = 0.0;
 }
 
 void Sampler::loop() {
@@ -49,32 +40,34 @@ void Sampler::loop() {
         data[(counter - 1) % this-> y ] = this->cbTakeSample();
     }
     if (this->cbTakeMeasurement && isMeasurementDue(counter)) {
-        uint32_t index = this->n + ((counter + (this->d -1) + (this->x - this->y)) / this->y) % this->t; 
-        data[index] = this->cbTakeMeasurement(data,this->n);
+        uint32_t index = params.nSamples + ((counter + (this->d -1) + (this->x - this->y)) / this->y) % params.transmitFrequency; 
+        data[index] = this->cbTakeMeasurement(data,params.nSamples);
     }
     if (this->cbTransmit && isTransmitDue(counter)) {
-        this->cbTransmit(data + this->n, this->t);
+        this->cbTransmit(data + params.nSamples, params.transmitFrequency);
     }
     uint32_t nominalSleepTime = calculateSleepTime(counter);
-    long correctionTime = (long)(this->o*1000UL);
-    this->configuration->incrementElapsed(nominalSleepTime - correctionTime);
+    long correctionTime = (long)(this->offset*1000UL);
+    this->configuration->incrementElapsed(correctionTime >  (long) nominalSleepTime ? 0 : (nominalSleepTime - correctionTime));
     this->configuration->save();
 
     correctionTime += millis() - this->initialTime;
-    unsigned long sleepTime = correctionTime > nominalSleepTime ? 0 : nominalSleepTime - correctionTime;
-    Espx::deepSleep((unsigned long)round(sleepTime*this->f)*1000UL, isTransmitDue(counter+1));
+    unsigned long sleepTime = (correctionTime > (long) nominalSleepTime) ? 0 : (nominalSleepTime - correctionTime);
+    Espx::deepSleep((unsigned long)round(sleepTime*sync.calibrationFactor)*1000UL, isTransmitDue(counter+1));
     this->setup();
 }
 
 void Sampler::synchronise(uint32_t timeInSeconds) {
     uint32_t processingSeconds = (millis() - this->initialTime)/1000;
-    if (this->l != 0) {
-        float actualElapsed = timeInSeconds - (this->l + processingSeconds);
-        this->o = actualElapsed - this->e;
-        this->f *= (1.0 - this->o/actualElapsed);
-        this->configuration->resetSynchronisation(timeInSeconds - processingSeconds, this->f);
+    if (sync.syncTime != 0) {
+        float actualElapsed = timeInSeconds - (sync.syncTime + processingSeconds);
+        if (sync.nominalElapsed > 0) {
+            this->offset = actualElapsed - sync.nominalElapsed;
+            sync.calibrationFactor *= (1.0 - this->offset/actualElapsed);
+        }
+        this->configuration->resetSynchronisation(timeInSeconds - processingSeconds, sync.calibrationFactor);
     } else {
-        this->configuration->resetSynchronisation(timeInSeconds- processingSeconds, 1.0);
+        this->configuration->resetSynchronisation(timeInSeconds - processingSeconds, 1.0);
     }
 }
 
@@ -93,16 +86,16 @@ void Sampler::onTransmit(TransmitCallBack fnTransmit) {
 uint32_t Sampler::calculateSleepTime(uint16_t c) {
     uint32_t sleepTime = 0;
     uint32_t cyclePos = (c -1) % this->y;
-    if (cyclePos < (this->n -1)) {
-        sleepTime = this->s;
-    } else if (cyclePos == (this->n -1)) {
+    if (cyclePos < (params.nSamples -1)) {
+        sleepTime = params.sampleInterval;
+    } else if (cyclePos == (params.nSamples -1)) {
         if (this->d > 1) {
-            sleepTime = MAX_SLEEP_TIME_MS - (this->n-1)*this->s;
+            sleepTime = MAX_SLEEP_TIME_MS - (params.nSamples-1)*params.sampleInterval;
         } else {
-            sleepTime = this->m - (this->n-1)*this->s;
+            sleepTime = params.measurementInterval - (params.nSamples-1)*params.sampleInterval;
         }
     } else if (c % this->y == 0) {
-        sleepTime = this->m % MAX_SLEEP_TIME_MS;
+        sleepTime = params.measurementInterval % MAX_SLEEP_TIME_MS;
         sleepTime = (sleepTime == 0)?MAX_SLEEP_TIME_MS:sleepTime;
     } else {
         sleepTime = MAX_SLEEP_TIME_MS;
@@ -115,9 +108,9 @@ bool Sampler::isTransmitDue(int32_t c) {
 }
 
 bool Sampler::isSampleDue(int32_t c) {
-    return ((c - 1) % (int32_t)this->y ) < (int32_t)this->n;
+    return ((c - 1) % (int32_t)this->y ) < (int32_t)params.nSamples;
 }
 
 bool Sampler::isMeasurementDue(int32_t c) {
-    return ((c - (int32_t)this->n) % (int32_t)this->y) == 0;
+    return ((c - (int32_t)params.nSamples) % (int32_t)this->y) == 0;
 }
