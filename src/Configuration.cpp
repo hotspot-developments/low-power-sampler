@@ -141,7 +141,8 @@ void Configuration::fromJson(const char * json) {
     pos = indexOf(',', json, pos);
     pos = (pos != NOT_FOUND) ? pos + 1 : length;
   }
-  this->rtcData.config.counter = 1;
+  this->resetCounter();
+  this->resetSynchronisation(0,1.0);
 }
 
 
@@ -154,6 +155,15 @@ bool Configuration::checkMemory() {
     return crcOfParams == crc32;
   }
   return false;
+}
+
+bool Configuration::equivalentTo(Configuration& other) {
+  return this->rtcData.config.currentVersion == other.rtcData.config.currentVersion &&
+         this->rtcData.config.measurementInterval ==  other.rtcData.config.measurementInterval &&
+         this->rtcData.config.nSamples ==  other.rtcData.config.nSamples &&
+         this->rtcData.config.sampleInterval ==  other.rtcData.config.sampleInterval &&
+         this->rtcData.config.transmitFrequency ==  other.rtcData.config.transmitFrequency
+         ;
 }
 
 bool Configuration::fromMemory() {

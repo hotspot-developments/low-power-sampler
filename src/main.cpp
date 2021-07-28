@@ -1,10 +1,4 @@
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-#define SENSOR_PIN D6
-#else
-#include <WiFi.h>
-#define SENSOR_PIN 34
-#endif
+#include "Espx.h"
 #include <PubSubClient.h>
 #include <WiFiUdp.h>
 
@@ -12,10 +6,15 @@
 #include "Configuration.h"
 #include "Sampler.h"
 
+#if defined(ESP8266)
+#define SENSOR_PIN D6
+#else
+#define SENSOR_PIN 34
+#endif
 #define MSG_SIZE 250
 #define NTP_PACKET_SIZE 48
 
-#define VERSION 100
+#define VERSION 104
 #define MS_DELAY_FOR_WIFI_CONNECTION   500
 #define MS_DELAY_FOR_MQTT_CONNECTION   500
 #define MS_DELAY_FOR_MQTT_RECEIVE      500
@@ -32,6 +31,7 @@ Sampler sampler(config);
 char msg[MSG_SIZE];                   // buffer to hold outgoing debug/mqtt messages.
 byte NTPBuffer[NTP_PACKET_SIZE];      // buffer to hold incoming and outgoing ntp packets.
 IPAddress timeServerIP;               // IP address of NTP server.
+uint16_t currentVersion = VERSION;
 
 void ntpReceiveMsg(byte* ntpBuffer) {
   unsigned long  NTPTime = 0 ;
@@ -44,6 +44,7 @@ void ntpReceiveMsg(byte* ntpBuffer) {
 }
 
 void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
+  Configuration updateConfig;
   Serial.printf("\nMessage arrived on: %s:\n", topic);
   char configJson[MAX_EXPECTED_CONFIG_STRING];
   for (unsigned int i=0; i < length; i++) {
@@ -51,9 +52,13 @@ void mqttReceiveMsg(char* topic, uint8_t *payload, unsigned int length) {
     configJson[i] = (char) payload[i];
   }
   configJson[length] =0;
-  config.fromJson(configJson);
-  config.populateStatusMsg(msg, MSG_SIZE);
-  Serial.println(msg);
+  updateConfig.fromMemory();
+  updateConfig.fromJson(configJson);
+  if (!updateConfig.equivalentTo(config)) {
+    config.fromJson(configJson);
+    config.populateStatusMsg(msg, MSG_SIZE);
+    Serial.printf("\nUpdated - %s\n",msg);
+  }
 }
 
 boolean setupWifi() {
@@ -116,7 +121,7 @@ boolean setupMqtt() {
 }
 
 uint16_t takeSample() {
-  Serial.printf("\nTaking sample... ");
+  Serial.printf("\nTaking sample...... ");
   return digitalRead(SENSOR_PIN);
 }
 
@@ -147,6 +152,29 @@ void waitForResponse(bool ntpRequired, bool mqttRequired) {
   Serial.println("\nFinished waiting for responses.");
 }
 
+void doUpdate() {
+  Serial.printf("\nPerforming update of firmware.\n");
+  ESPhttpUpdate.rebootOnUpdate(false);
+  t_httpUpdate_return ret = Espx::httpUpdate(espClient, UPDATE_SERVER, UPDATE_PORT, UPDATE_PATH);
+  switch (ret) {
+  case HTTP_UPDATE_FAILED:
+    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+    config.setVersion(currentVersion);
+    break;
+  
+  case HTTP_UPDATE_NO_UPDATES:
+    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    break;
+  
+  case HTTP_UPDATE_OK:
+    Serial.println("HTTP_UPDATE_OK");
+    config.save();
+    ESP.restart();
+    break;
+  }
+}
+
+
 void transmit(uint16_t * measurement, uint32_t n) {
   Serial.printf("\nCommunicating with base... ");
   setupWifi();
@@ -174,6 +202,9 @@ void transmit(uint16_t * measurement, uint32_t n) {
   }
   waitForResponse(ntpInitiated, mqttConnected);
   if (mqttConnected)  mqttClient.disconnect();
+  if (config.getVersion() > currentVersion) {
+    doUpdate();
+  }
 }
 
 // ===============  Arduino Pattern ===================================================
@@ -186,13 +217,14 @@ void setup() {
   config.setParameters(180000,5000,5,1);  // Default parameters - used first time round.
   config.setVersion(VERSION);
   boolean isFirstTime = !config.checkMemory();
-  Serial.printf("\nSetup: configuration taken from %s.", !isFirstTime?"memory":"defaults");
+  Serial.printf("\nSetup: Configuration taken from %s.", !isFirstTime?"memory":"defaults");
   sampler.setup();
   sampler.onTakeSample(takeSample);
   sampler.onTakeMeasurement(takeMeasurement);
   sampler.onTransmit(transmit);
   config.populateStatusMsg(msg, MSG_SIZE);
   Serial.println(msg);
+  currentVersion = config.getVersion();
 }
 
 void loop() {

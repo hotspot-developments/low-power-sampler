@@ -26,6 +26,13 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#include <ESP8266httpUpdate.h>
+#else
+#include <WiFi.h>
+#include <ESP32httpUpdate.h>
+#endif
 
 
 class Espx {
@@ -35,6 +42,9 @@ class Espx {
 
         static bool rtcUserMemoryRead(uint32_t offset, uint32_t *data, size_t size);
         static bool rtcUserMemoryWrite(uint32_t offset, uint32_t *data, size_t size);
+
+        static t_httpUpdate_return httpUpdate(WiFiClient& client, const String& host, uint16_t port, const String& uri = "/",
+                               const String& currentVersion = "");
 
 };
 

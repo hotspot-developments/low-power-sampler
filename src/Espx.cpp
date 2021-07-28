@@ -25,6 +25,10 @@ bool Espx::rtcUserMemoryWrite(uint32_t offset, uint32_t *data, size_t size){
     return true;
 }
 
+t_httpUpdate_return Espx::httpUpdate(WiFiClient& client, const String& host, uint16_t port, const String& uri,
+                               const String& currentVersion) {
+    return ESPhttpUpdate.update(host, port, uri, currentVersion);
+}
 #elif defined(ESP8266)
 
 void Espx::deepSleep(uint64_t time_us, bool wakeWithWifi = true) {
@@ -38,4 +42,8 @@ bool Espx::rtcUserMemoryWrite(uint32_t offset, uint32_t *data, size_t size){
     return ESP.rtcUserMemoryWrite(offset, data, size);
 }
 
+t_httpUpdate_return Espx::httpUpdate(WiFiClient& client, const String& host, uint16_t port, const String& uri,
+                               const String& currentVersion) {
+    return ESPhttpUpdate.update(client, host, port, uri, currentVersion);
+}
 #endif

@@ -75,6 +75,7 @@ class Configuration {
     void populateParameters(Parameters* params);
     void populateSynchronisation(Synchronisation* sync);
     void populateStatusMsg(char * msg, size_t length);
+    bool equivalentTo(Configuration& other);
     void fromJson(const char * json);
     bool checkMemory();
     bool fromMemory();
