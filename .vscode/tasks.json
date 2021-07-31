@@ -6,10 +6,8 @@
 			"label": "C/C++: gcc build test",
 			"command": "/usr/bin/gcc",
 			"args": [
-				"-I/home/simon/Documents/PlatformIO/Projects/210219-172326-nodemcuv2/test",
-				"-I/home/simon/Documents/PlatformIO/Projects/210219-172326-nodemcuv2/test/fake",
                 "-I/home/simon/.platformio/packages/framework-arduinoespressif8266/libraries/ESP8266WiFi/src",
-                "-I/home/simon/Documents/PlatformIO/Projects/210219-172326-nodemcuv2/.pio/libdeps/nodemcuv2/PubSubClient/src",
+                "-I/home/simon/.platformio/packages/framework-arduinoespressif8266/libraries/ESP8266httpUpdate/src",
                 "-I/home/simon/.platformio/packages/framework-arduinoespressif8266/tools/sdk/include",
 				"-I/home/simon/.platformio/packages/framework-arduinoespressif8266/cores/esp8266",
 				"-g",

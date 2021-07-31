@@ -26,6 +26,8 @@
 #include <string.h>
 #include <stdarg.h>
 
+#define WiFi_h
+
 /**
  * AVR macros for WDT managment
  */
@@ -93,6 +95,38 @@ class SerialFake {
 };
 
 void SerialFake::printf(const char* format, ...) {};
+
+
+#define WiFi_h
+
+class WiFiClient {};
+
+#define ESP8266HTTPUPDATE_H_
+enum HTTPUpdateResult {
+    HTTP_UPDATE_FAILED,
+    HTTP_UPDATE_NO_UPDATES,
+    HTTP_UPDATE_OK
+};
+
+typedef HTTPUpdateResult t_httpUpdate_return; // backward compatibility
+
+class String {
+    public:
+        String(const char *cstr) { };
+};
+
+class HttpUpdateFake {
+    public:
+     t_httpUpdate_return update(WiFiClient& client, const String& host, uint16_t port, const String& uri = "",
+                               const String& currentVersion = "");
+};
+
+
+t_httpUpdate_return HttpUpdateFake::update(WiFiClient& client, const String& host, uint16_t port, const String& uri,
+                               const String& currentVersion){return HTTP_UPDATE_OK;};
+
+
+
 
 class EspClass {
     private:
@@ -217,6 +251,7 @@ RFMode EspClass::getSleepMode() {
     return this->sleepMode;
 }
 SerialFake Serial;
+HttpUpdateFake ESPhttpUpdate;
 EspClass ESP;
 
 unsigned long ticks = 0;

@@ -306,7 +306,77 @@ TEST(ConfigurationTest, LoadConfigurationLoadsSynchronizationDataFromMemory) {
     ASSERT_FLOAT_EQ(sync.calibrationFactor, 1.0005);
 }
 
+TEST(ConfigurationTest, EquivalencyOnVersion) {
+    Configuration config;
+    Configuration otherConfig;
 
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+
+    config.setVersion(10);
+    ASSERT_FALSE(config.equivalentTo(otherConfig));
+    ASSERT_FALSE(otherConfig.equivalentTo(config));
+
+    otherConfig.setVersion(10);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+}
+
+TEST(ConfigurationTest, EquivalencyOnParameters) {
+    Configuration config;
+    Configuration otherConfig;
+
+    config.setParameters(10000, 1000, 5, 1);
+    otherConfig.setParameters(10000, 1000, 5, 1);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+
+    config.setParameters(11000, 1000, 5, 10);
+    ASSERT_FALSE(config.equivalentTo(otherConfig));
+    ASSERT_FALSE(otherConfig.equivalentTo(config));
+
+    otherConfig.setParameters(11000, 1000, 5, 10);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+
+    otherConfig.setParameters(11000, 2000, 5, 1);
+    ASSERT_FALSE(config.equivalentTo(otherConfig));
+    ASSERT_FALSE(otherConfig.equivalentTo(config));
+
+    config.setParameters(11000, 2000, 5, 1);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+
+    otherConfig.setParameters(11000, 2000, 2, 1);
+    ASSERT_FALSE(config.equivalentTo(otherConfig));
+    ASSERT_FALSE(otherConfig.equivalentTo(config));
+    
+    config.setParameters(11000, 2000, 2, 1);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+    
+    otherConfig.setParameters(11000, 2000, 2, 5);
+    ASSERT_FALSE(config.equivalentTo(otherConfig));
+    ASSERT_FALSE(otherConfig.equivalentTo(config));
+    
+    config.setParameters(11000, 2000, 2, 5);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+}
+
+TEST(ConfigurationTest, EquivalencyIgnoresCounter) {
+    Configuration config;
+    Configuration otherConfig;
+
+    config.setParameters(10000, 1000, 5, 1);
+    otherConfig.setParameters(10000, 1000, 5, 1);
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+
+    config.incrementCounter();
+    ASSERT_TRUE(config.equivalentTo(otherConfig));
+    ASSERT_TRUE(otherConfig.equivalentTo(config));
+}
 
 
 int main(int argc, char** argv) {
